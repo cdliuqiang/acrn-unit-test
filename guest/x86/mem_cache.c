@@ -606,24 +606,6 @@ void test_cache_type_wt_wp()
 	asm volatile("mfence" ::: "memory");
 }
 
-void mem_cache_test_map_to_none()
-{
-	//struct alloc_ops *alloc_ops_tmp;
-	
-	debug_print("***********map_to_none****************\n");
-
-	//none_pate_init();
-		
-	//alloc_ops_tmp = alloc_ops;
-	//alloc_ops = &vmalloc_ops_none;
-	setup_mmu_range_tmp(phys_to_virt(read_cr3()), 1ul<<32, (1ul<<32)+(1ul << 30)); //4G-5G  map to none
-	cache_test_array = (u64*) (1ul<<32);
-	mem_cache_test_write_all(3);
-	mem_cache_test_read_all(3);
-	
-	//alloc_ops = alloc_ops_tmp;
-}
-
 #if 0
 void test_cache_type_wc_uc(void)
 {
@@ -701,8 +683,6 @@ void test_cache_type(void)
 		//test_cache_type_wc_uc();
 	}
 #endif
-
-	//mem_cache_test_map_to_none();
 }
 
 extern char edata;
@@ -1112,7 +1092,8 @@ void cache_test_disable_paging()
 	cr0 = read_cr0();
 	debug_print("CR0 = 0x%x\n", cr0);
 	
-	//flush TLBs;
+	//flush caches and TLBs
+	asm volatile ("   wbinvd\n" : : : "memory");
 	flush_tlb();
 }
 
@@ -1181,7 +1162,21 @@ void cache_test_case_map_to_device_physical(int time)
 */
 void cache_test_case_map_to_none_linear(int time)
 {
+	u64 * tmp = cache_test_array;
 	debug_print("************map_to_none_linear***************\n");
+	//struct alloc_ops *alloc_ops_tmp;
+	
+	//none_pate_init();
+		
+	//alloc_ops_tmp = alloc_ops;
+	//alloc_ops = &vmalloc_ops_none;
+	setup_mmu_range_tmp(phys_to_virt(read_cr3()), 1ul<<32, (1ul << 30)); //4G-5G  map to none
+	cache_test_array = (u64*) (1ul<<32);
+	mem_cache_test_write_all(3);
+	mem_cache_test_read_all(3);
+	
+	//alloc_ops = alloc_ops_tmp;
+	cache_test_array = tmp;
 }
 
 /*
@@ -1192,13 +1187,22 @@ void cache_test_case_map_to_none_linear(int time)
 * ACRN hypervisor shall guarantee that the access follows caching and read/write policy 
 * of normal cache mode with effective memory type being UC.
 */
+//32bit mode
 void cache_test_case_map_to_none_physical(int time)
 {
+	u64 * tmp = cache_test_array;
 	debug_print("************map_to_none_physical***************\n");
 
 	cache_test_disable_paging();
-		
+
+	//setup_mmu_range_tmp(phys_to_virt(read_cr3()), 3ul << 30, (1ul << 30)); //3G-4G  map to none
+	cache_test_array = (u64*) (3ul << 30);
+	mem_cache_test_write_all(3);
+	mem_cache_test_read_all(3);
+	
 	cache_test_enable_paging();
+
+	cache_test_array = tmp;
 }
 
 /*
@@ -1377,12 +1381,15 @@ int main(int ac, char **av)
 	//phys_alloc_show();
 	//memset(cache_test_array, 0, cache_over_l3_size2*8);
 
+#ifdef __x86_64__
 	cache_test_case_no_fill_cache(3);
 	//cache_test_case_map_to_device_linear(3);
-	//cache_test_case_map_to_device_physical(3);
 	//cache_test_case_map_to_none_linear(3);
+	//cache_test_case_map_to_memory_linear(3);
+#else
+	//cache_test_case_map_to_device_physical(3);
 	//cache_test_case_map_to_none_physical(3);
-	cache_test_case_map_to_memory_linear(3);
+#endif
 	
 	
 	debug_print("mem cache control memory malloc success\n");
