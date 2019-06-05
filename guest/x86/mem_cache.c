@@ -73,18 +73,18 @@ u64 ia32_pat_test;
 
 //default PAT entry value 0007040600070406
 u64 cache_type_UC = 0x0;
-u64 cache_type_WB = 0x0606060606060600;
-u64 cache_type_WC = 0x0101010101010100;
-u64 cache_type_WT = 0x0404040404040400;
-u64 cache_type_WP = 0x0505050505050500;
+u64 cache_type_WB = 0x6;
+u64 cache_type_WC = 0x1;
+u64 cache_type_WT = 0x4;
+u64 cache_type_WP = 0x5;
 
 u64 test_value = 0x1122334455667788;
 
 u64 cache_line_size=64;
 
-#define PT_PWT_MASK		(1ull << 3)
-#define PT_PCD_MASK		(1ull << 4)
-#define PT_PAT_MASK		(1ull << 7)
+//#define PT_PWT_MASK		(3ull << 0)
+//#define PT_PCD_MASK		(4ull << 0)
+//#define PT_PAT_MASK		(7ull << 0)
 
 #if 0
 u64 cache_l1_size=0x2000;	//64K
@@ -262,45 +262,26 @@ void mem_cache_reflush_cache()
 
 void mem_cache_test_set_type(u64 cache_type)
 {
-/*
 	u64 ia32_pat_test;
 
 	ia32_pat_test = rdmsr(MSR_IA32_CR_PAT_TEST);
 	debug_print("ia32_pat_test 0x%lx \n",ia32_pat_test);
 	
-	//wrmsr(MSR_IA32_CR_PAT_TEST,(ia32_pat_test&(~0xFF0000))|(cache_type<<16));
-	wrmsr(MSR_IA32_CR_PAT_TEST,cache_type);
+	wrmsr(MSR_IA32_CR_PAT_TEST,(ia32_pat_test&(~0xff00))|(cache_type<<8));
 	
 	ia32_pat_test = rdmsr(MSR_IA32_CR_PAT_TEST);
 	debug_print("ia32_pat_test 0x%lx \n",ia32_pat_test);
 	
-	if(ia32_pat_test != cache_type)
+	if(((ia32_pat_test>>8)&0xFF) != cache_type)
 		debug_print("set pat type error set=0x%lx, get=0x%lx\n", cache_type, ia32_pat_test);
 	else
-		debug_print("set pat type sucess type=0x%lx get=0x%lx\n", cache_type, ia32_pat_test);
+		debug_print("set pat type sucess type=0x%lx\n", cache_type);
 
 	asm volatile("mfence" ::: "memory");
 	asm volatile ("   wbinvd\n" : : : "memory");
 	asm volatile("mfence" ::: "memory");	
 
 	mem_cache_reflush_cache();
-*/
-	//not free
-	//if(cache_test_array != NULL)
-	//	free(cache_test_array);
-
-	pt_memory_type_set(cache_type);
-
-	//flush caches and TLBs
-	asm volatile ("   wbinvd\n" : : : "memory");
-	flush_tlb();
-	
-	cache_test_array = (u64 *)malloc(cache_over_l3_size2*8);
-	if(cache_test_array==NULL){
-		debug_print("malloc error\n");
-		return;
-	}
-	debug_print("cache_test_array=%p\n", cache_test_array);
 }
 
 void mem_cache_test_set_type_all(u64 cache_type)
@@ -510,7 +491,7 @@ void test_cache_type_uc(int time)
 	u64 type=cache_type_UC;
 	debug_print("************uc*************** 0x%lx 0x%lx\n", cache_type_UC, type);
 	//program MSR
-	mem_cache_test_set_type(PT_MEMORY_TYPE_MASK4);
+	mem_cache_test_set_type(cache_type_UC);
 
 	mem_cache_test_write_all(time);
 	mem_cache_test_read_all(time);
@@ -520,7 +501,7 @@ void test_cache_type_wb(int time)
 {
 	debug_print("************wb***************\n");
 	//program MSR
-	mem_cache_test_set_type(PT_MEMORY_TYPE_MASK0);
+	mem_cache_test_set_type(cache_type_WB);
 
 	mem_cache_test_write_all(time);
 	mem_cache_test_read_all(time);
@@ -530,7 +511,7 @@ void test_cache_type_wc(int time)
 {
 	debug_print("************wc***************\n");
 	//program MSR
-	mem_cache_test_set_type(PT_MEMORY_TYPE_MASK3);
+	mem_cache_test_set_type(cache_type_WC);
 	
 	mem_cache_test_write_all(time);
 	mem_cache_test_read_all(time);
@@ -540,7 +521,7 @@ void test_cache_type_wt(int time)
 {
 	debug_print("************wt***************\n");
 	//program MSR
-	mem_cache_test_set_type(PT_MEMORY_TYPE_MASK2);
+	mem_cache_test_set_type(cache_type_WT);
 
 	mem_cache_test_write_all(time);
 	mem_cache_test_read_all(time);
@@ -550,7 +531,7 @@ void test_cache_type_wp(int time)
 {
 	debug_print("************wp***************\n");
 	//program MSR
-	mem_cache_test_set_type(PT_MEMORY_TYPE_MASK1);
+	mem_cache_test_set_type(cache_type_WP);
 
 	mem_cache_test_write_all(time);
 	mem_cache_test_read_all(time);
@@ -1361,8 +1342,7 @@ void calibrate_tsc(void)
 
 int main(int ac, char **av)
 {
-	//default PAT entry value 0007040600070406
-	mem_cache_test_set_type_all(0x0000000001040506);
+	pt_memory_type_set(PT_MEMORY_TYPE_MASK1);
 	setup_vm();
 	//setup_idt();
 	//smp_init();
