@@ -545,7 +545,7 @@ void test_cache_type_wt_wp()
 	//u64 ts_delta_all = 0;
 	u64 cache_size = cache_l3_size;
 	debug_print("************wt_wp***************\n");
-	mem_cache_test_set_type(PT_MEMORY_TYPE_MASK2);
+	mem_cache_test_set_type(cache_type_WT);
 
 	debug_print("wt read cache_test_size %lx\n",cache_size);
 	mem_cache_test_read(cache_size);
@@ -574,7 +574,7 @@ void test_cache_type_wt_wp()
 	//printf("%ld\n", ts_delta_all);
 	
 	////////////////////////////////
-	mem_cache_test_set_type(PT_MEMORY_TYPE_MASK1);
+	mem_cache_test_set_type(cache_type_WP);
 	debug_print("wp read cache_test_size %lx\n",cache_size);
 	mem_cache_test_read(cache_size);
 	mem_cache_test_read(cache_size);
