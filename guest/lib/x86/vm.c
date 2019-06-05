@@ -3,6 +3,12 @@
 #include "vmalloc.h"
 #include "alloc_page.h"
 
+u64 PT_MEMORY_TYPE   = PT_MEMORY_TYPE_MASK0;
+
+void pt_memory_type_set(u64 type)
+{
+	PT_MEMORY_TYPE = type;
+}
 pteval_t *install_pte(pgd_t *cr3,
 		      int pte_level,
 		      void *virt,
@@ -27,7 +33,7 @@ pteval_t *install_pte(pgd_t *cr3,
 	pt = phys_to_virt(pt[offset] & PT_ADDR_MASK);
     }
     offset = PGDIR_OFFSET((uintptr_t)virt, level);
-    pt[offset] = pte;
+    pt[offset] = pte | PT_MEMORY_TYPE;
     return &pt[offset];
 }
 
@@ -132,10 +138,10 @@ static void setup_mmu_range(pgd_t *cr3, phys_addr_t start, size_t len)
 	u64 max = (u64)len + (u64)start;
 	u64 phys = start;
 
-	while (phys + LARGE_PAGE_SIZE <= max) {
-		install_large_page(cr3, phys, (void *)(ulong)phys);
-		phys += LARGE_PAGE_SIZE;
-	}
+	//while (phys + LARGE_PAGE_SIZE <= max) {
+	//	install_large_page(cr3, phys, (void *)(ulong)phys);
+	//	phys += LARGE_PAGE_SIZE;
+	//}
 	install_pages(cr3, phys, max - phys, (void *)(ulong)phys);
 }
 
@@ -146,8 +152,8 @@ void *setup_mmu(phys_addr_t end_of_memory)
     memset(cr3, 0, PAGE_SIZE);
 
 #ifdef __x86_64__
-    if (end_of_memory < (1ul << 32))
-        end_of_memory = (1ul << 32);  /* map mmio 1:1 */
+    //if (end_of_memory < (1ul << 32))
+    //    end_of_memory = (1ul << 32);  /* map mmio 1:1 */
 
     setup_mmu_range(cr3, 0, end_of_memory);
 #else

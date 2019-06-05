@@ -25,6 +25,21 @@ typedef unsigned long pgd_t;
 #define LARGE_PAGE_SIZE	(1024 * PAGE_SIZE)
 #endif
 
+#define PT_PWT_MASK                    (1ull << 3)
+#define PT_PCD_MASK                    (1ull << 4)
+#define PT_PAT_MASK                    (1ull << 7)
+
+#define PT_MEMORY_TYPE_MASK0   0
+#define PT_MEMORY_TYPE_MASK1   (PT_PWT_MASK)
+#define PT_MEMORY_TYPE_MASK2   (PT_PCD_MASK)
+#define PT_MEMORY_TYPE_MASK3   (PT_PWT_MASK|PT_PCD_MASK)
+#define PT_MEMORY_TYPE_MASK4   (PT_PAT_MASK)
+#define PT_MEMORY_TYPE_MASK5   (PT_PAT_MASK|PT_PWT_MASK)
+#define PT_MEMORY_TYPE_MASK6   (PT_PAT_MASK|PT_PCD_MASK)
+#define PT_MEMORY_TYPE_MASK7   (PT_PAT_MASK|PT_PCD_MASK|PT_PWT_MASK)
+
+//#define PT_MEMORY_TYPE_MASK    PT_MEMORY_TYPE_MASK1
+
 #define PT_PRESENT_MASK		(1ull << 0)
 #define PT_WRITABLE_MASK	(1ull << 1)
 #define PT_USER_MASK		(1ull << 2)
