@@ -576,6 +576,7 @@ void test_cache_type_wt_wp()
 	mem_cache_test_set_type(PT_MEMORY_TYPE_MASK2);
 
 	debug_print("wt read cache_test_size %lx\n",cache_size);
+	asm volatile ("   wbinvd\n" : : : "memory");
 	mem_cache_test_write(cache_size);
 	
 	mem_cache_test_read(cache_size);
@@ -595,6 +596,7 @@ void test_cache_type_wt_wp()
 	////////////////////////////////
 	mem_cache_test_set_type(PT_MEMORY_TYPE_MASK1);
 	debug_print("wp read cache_test_size %lx\n",cache_size);
+	asm volatile ("   wbinvd\n" : : : "memory");
 	mem_cache_test_write(cache_size);
 	
 	mem_cache_test_read(cache_size);

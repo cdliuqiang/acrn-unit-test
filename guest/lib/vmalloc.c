@@ -67,7 +67,7 @@ static void *vm_memalign(size_t alignment, size_t size)
 		phys_addr_t pa = virt_to_phys(alloc_page());
 		install_page(page_root, pa, (void *)(ulong)pa);
 		if(mem== NULL)
-			mem= pa;
+			mem= (void *)pa;
 	}
 	return mem;
 }
