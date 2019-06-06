@@ -56,17 +56,18 @@ void *vmap(phys_addr_t phys, size_t size)
 
 static void *vm_memalign(size_t alignment, size_t size)
 {
-	void *mem, *p;
+	void *mem=NULL;
 	unsigned pages;
 
 	assert(alignment <= PAGE_SIZE);
 	size = (size + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
 	pages = size / PAGE_SIZE;
-	mem = p = alloc_vpages(pages);
+	//mem = p = alloc_vpages(pages);
 	while (pages--) {
 		phys_addr_t pa = virt_to_phys(alloc_page());
-		install_page(page_root, pa, p);
-		p += PAGE_SIZE;
+		install_page(page_root, pa, (void *)(ulong)pa);
+		if(mem== NULL)
+			mem= pa;
 	}
 	return mem;
 }

@@ -168,6 +168,15 @@ void disorder_access_size(u64 size)
 	printf("%ld\n", ts_delta_all);
 }
 
+void disorder_access_size_time(u64 size, int time)
+{
+	int i=0;
+
+	for(i=0; i<time; i++){
+		disorder_access_size(size);
+	}
+}
+
 void write_cr0_bybit(u32 bit, u32 bitvalue)
 {
 	u32 cr0 = read_cr0();
@@ -290,10 +299,6 @@ void mem_cache_test_set_type(u64 cache_type)
 	//	free(cache_test_array);
 
 	pt_memory_type_set(cache_type);
-
-	//flush caches and TLBs
-	asm volatile ("   wbinvd\n" : : : "memory");
-	flush_tlb();
 	
 	cache_test_array = (u64 *)malloc(cache_over_l3_size2*8);
 	if(cache_test_array==NULL){
@@ -301,6 +306,10 @@ void mem_cache_test_set_type(u64 cache_type)
 		return;
 	}
 	debug_print("cache_test_array=%p\n", cache_test_array);
+	
+	//flush caches and TLBs
+	asm volatile ("   wbinvd\n" : : : "memory");
+	flush_tlb();
 }
 
 void mem_cache_test_set_type_all(u64 cache_type)
@@ -562,26 +571,17 @@ void test_cache_type_wt_wp()
 	//u64 i;
 	//u64 ts_delta = 0;
 	//u64 ts_delta_all = 0;
-	u64 cache_size = cache_l3_size;
+	u64 cache_size = cache_l1_size;
 	debug_print("************wt_wp***************\n");
 	mem_cache_test_set_type(PT_MEMORY_TYPE_MASK2);
 
 	debug_print("wt read cache_test_size %lx\n",cache_size);
-	mem_cache_test_read(cache_size);
-	mem_cache_test_read(cache_size);
-	mem_cache_test_read(cache_size);
-
-	mem_cache_test_write(cache_size);
-	mem_cache_test_write(cache_size);
 	mem_cache_test_write(cache_size);
 	
 	mem_cache_test_read(cache_size);
 	mem_cache_test_read(cache_size);
 	mem_cache_test_read(cache_size);
 
-	mem_cache_test_write(cache_size);
-	mem_cache_test_write(cache_size);
-	mem_cache_test_write(cache_size);
 	//i=cache_l3_size;
 	//ts_delta =0;
 	//ts_delta_all =0;
@@ -595,21 +595,11 @@ void test_cache_type_wt_wp()
 	////////////////////////////////
 	mem_cache_test_set_type(PT_MEMORY_TYPE_MASK1);
 	debug_print("wp read cache_test_size %lx\n",cache_size);
-	mem_cache_test_read(cache_size);
-	mem_cache_test_read(cache_size);
-	mem_cache_test_read(cache_size);
-
-	mem_cache_test_write(cache_size);
-	mem_cache_test_write(cache_size);
 	mem_cache_test_write(cache_size);
 	
 	mem_cache_test_read(cache_size);
 	mem_cache_test_read(cache_size);
 	mem_cache_test_read(cache_size);
-
-	mem_cache_test_write(cache_size);
-	mem_cache_test_write(cache_size);
-	mem_cache_test_write(cache_size);
 	//i=cache_l3_size;
 	//ts_delta =0;
 	//ts_delta_all =0;
@@ -836,7 +826,7 @@ void cache_test_case_l3_control()
 * ACRN hypervisor shall expose CLFLUSH instruction to any VM, 
 * in compliance with Chapter 9.6, Vol. 3, SDM.
 */
-void cache_test_case_clflush(void)
+void cache_test_case_clflush_001(void)
 {
 	struct cpuid cpuid1;
 	int expected;
@@ -849,13 +839,65 @@ void cache_test_case_clflush(void)
 	report("clflush (%s)", expected==1, expected?"present":"absent");
 }
 
+void cache_test_case_clflush_all_line(u64 size)
+{
+	int i;
+
+	for(i=0; i<size; i++){
+		asm volatile("clflush (%0)" : : "b" (&cache_test_array[i]));
+	}
+}
+
+void cache_test_case_clflush_read(u64 size, int time)
+{
+	int i=0;
+
+	for(i=0; i<time; i++){
+		cache_test_case_clflush_all_line(size);
+		mem_cache_test_read(size);
+	}
+}
+
+void cache_test_case_clflush_disroder_read(u64 size, int time)
+{
+	int i=0;
+
+	for(i=0; i<time; i++){
+		cache_test_case_clflush_all_line(size);
+		disorder_access_size(size);
+	}
+}
+
+void cache_test_case_clflush_002(int time)
+{
+	//program MSR
+	mem_cache_test_set_type(PT_MEMORY_TYPE_MASK0);
+
+	debug_print("************ wb no clflush read***************\n");
+	mem_cache_test_read_time_invd(cache_l3_size, time);
+	
+	debug_print("************ wb clflush read***************\n");
+	cache_test_case_clflush_read(cache_l3_size, time);
+}
+
+void cache_test_case_clflush_003(int time)
+{
+	mem_cache_test_set_type(PT_MEMORY_TYPE_MASK0);
+	
+	debug_print("************ wb no clflush disorder read***************\n");
+	disorder_access_size_time(cache_l3_size, time);
+
+	debug_print("************ wb clflush disorder read***************\n");
+	cache_test_case_clflush_disroder_read(cache_l3_size, time);
+}
+
 /*
 * ID:139249	
 * Name:Cache control CLFLUSHOPT instruction
 * ACRN hypervisor shall expose CLFLUSHOPT instruction to any VM, 
 * in compliance with CLFLUSHOPT, Vol. 2, SDM.
 */
-void cache_test_case_clflushopt(void)
+void cache_test_case_clflushopt_001(void)
 {
 	struct cpuid cpuid7;
 	int expected;
@@ -867,6 +909,58 @@ void cache_test_case_clflushopt(void)
 	/* clflushopt (%rbx): */
 	asm volatile(".byte 0x66, 0x0f, 0xae, 0x3b" : : "b" (&target));
 	report("clflushopt (%s)", expected==1, expected?"present":"absent");
+}
+
+void cache_test_case_clflushopt_all_line(u64 size)
+{
+	int i;
+
+	for(i=0; i<size; i++){
+		asm volatile(".byte 0x66, 0x0f, 0xae, 0x3b" : : "b" (&cache_test_array[i]));
+	}
+}
+
+void cache_test_case_clflushopt_read(u64 size, int time)
+{
+	int i=0;
+
+	for(i=0; i<time; i++){
+		cache_test_case_clflushopt_all_line(size);
+		mem_cache_test_read(size);
+	}
+}
+
+void cache_test_case_clflushopt_disroder_read(u64 size, int time)
+{
+	int i=0;
+
+	for(i=0; i<time; i++){
+		cache_test_case_clflushopt_all_line(size);
+		disorder_access_size(size);
+	}
+}
+
+void cache_test_case_clflushopt_002(int time)
+{
+	//program MSR
+	mem_cache_test_set_type(PT_MEMORY_TYPE_MASK0);
+
+	debug_print("************ wb no clflushopt read***************\n");
+	mem_cache_test_read_time_invd(cache_l3_size, time);
+
+	debug_print("************ wb clflushopt read***************\n");
+	cache_test_case_clflushopt_read(cache_l3_size, time);
+}
+
+void cache_test_case_clflushopt_003(int time)
+{
+	mem_cache_test_set_type(PT_MEMORY_TYPE_MASK0);
+	
+	debug_print("************ wb no clflushopt disorder read***************\n");
+	disorder_access_size_time(cache_l3_size, time);
+
+	debug_print("************ wb clflushopt disorder read***************\n");
+	cache_test_case_clflushopt_disroder_read(cache_l3_size, time);
 }
 
 /*
@@ -1376,12 +1470,25 @@ int main(int ac, char **av)
 	//write_cr0_bybit(CR0_BIT_PG, 0);
 	test_register_get();
 	calibrate_tsc();
+
+	cache_test_array = (u64 *)malloc(cache_over_l3_size2*8);
+	if(cache_test_array==NULL){
+		debug_print("malloc error\n");
+		return -1;
+	}
+	debug_print("cache_test_array=%p\n", cache_test_array);
+	
 	//cache_test_case_cpuid4();
 	//cache_test_case_invd();
 	//cache_test_case_CD_NW_control();
 	//cache_test_case_l3_control();
-	//cache_test_case_clflush();
-	//cache_test_case_clflushopt();
+	cache_test_case_clflush_001();
+	cache_test_case_clflush_002(41);
+	cache_test_case_clflush_003(41);
+	
+	cache_test_case_clflushopt_001();
+	cache_test_case_clflushopt_002(41);
+	cache_test_case_clflushopt_003(41);
 	//cache_test_case_l1_control();
 	//cache_test_case_MTRR_general();
 	//cache_test_case_MTRR_fixed();
@@ -1392,19 +1499,13 @@ int main(int ac, char **av)
 	//cache_test_case_PREFETCHW();
 
 	//alloc_ops = &vmalloc_ops_type_2;
-	cache_test_array = (u64 *)malloc(cache_over_l3_size2*8);
-	if(cache_test_array==NULL){
-		debug_print("malloc error\n");
-		return -1;
-	}
-	debug_print("cache_test_array=%p\n", cache_test_array);
 	//phys_alloc_show();
 	//memset(cache_test_array, 0, cache_over_l3_size2*8);
 
 #ifdef __x86_64__
-	cache_test_case_no_fill_cache(3);
+	//cache_test_case_no_fill_cache(3);
 	//cache_test_case_map_to_device_linear(3);
-	//cache_test_case_map_to_none_linear(3);
+	cache_test_case_map_to_none_linear(3);
 	//cache_test_case_map_to_memory_linear(3);
 #else
 	//cache_test_case_map_to_device_physical(3);
