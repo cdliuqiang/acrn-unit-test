@@ -134,7 +134,7 @@ static void wraccess(unsigned long address, unsigned long value)
 	//asm volatile("mfence" ::: "memory");
 }
 
-u64 disorder_access(u64 index)
+u64 disorder_access(u64 index, u64 size)
 {
     int i=0;
 	u64 *p;
@@ -142,7 +142,7 @@ u64 disorder_access(u64 index)
 	u64 disorder_index = 0;
 
 	t[0] = rdtsc_test();
-	disorder_index = (index*(t[0]&0xffff))%cache_l3_size;
+	disorder_index = (index*(t[0]&0xffff))%size;
 	p=&cache_test_array[disorder_index];
 	
 	t[0] = rdtsc_test();
@@ -161,7 +161,7 @@ void disorder_access_size(u64 size)
 
 	i=size;
 	while(i){
-		ts_delta = disorder_access(i);
+		ts_delta = disorder_access(i, size);
 		ts_delta_all = ts_delta_all + ts_delta;
 		i--;
 	}
@@ -365,15 +365,18 @@ void mem_cache_test_write(u64 size)
 {
 	u64 index;
 	u64 t[2] = {0};
-	
 	u64 tt = rdtsc_test();
-
-	t[0] = rdtsc_test();
+	u64 t_total=0;
+	
 	for(index=0; index<size; index++){
-		wraccess((unsigned long )&cache_test_array[index],tt+index);
+		tt += index;
+		t[0] = rdtsc_test();
+		wraccess((unsigned long )&cache_test_array[index],tt);
+		t[1] = rdtsc_test();
+		t_total += t[1] - t[0];
 	}
-	t[1] = rdtsc_test();
-	printf("%ld\n", (t[1]-t[0]));
+	
+	printf("%ld\n", t_total);
 	asm volatile("mfence" ::: "memory");
 }
 
@@ -579,38 +582,20 @@ void test_cache_type_wt_wp()
 	asm volatile ("   wbinvd\n" : : : "memory");
 	mem_cache_test_write(cache_size);
 	
-	mem_cache_test_read(cache_size);
-	mem_cache_test_read(cache_size);
-	mem_cache_test_read(cache_size);
+	disorder_access_size(cache_size);
+	disorder_access_size(cache_size);
+	disorder_access_size(cache_size);
 
-	//i=cache_l3_size;
-	//ts_delta =0;
-	//ts_delta_all =0;
-	//while(i){
-	//	ts_delta = disorder_access(i);
-	//	ts_delta_all = ts_delta_all + ts_delta;
-	//	i--;
-	//}
-	//printf("%ld\n", ts_delta_all);
-	
+
 	////////////////////////////////
 	mem_cache_test_set_type(PT_MEMORY_TYPE_MASK1);
 	debug_print("wp read cache_test_size %lx\n",cache_size);
 	asm volatile ("   wbinvd\n" : : : "memory");
 	mem_cache_test_write(cache_size);
 	
-	mem_cache_test_read(cache_size);
-	mem_cache_test_read(cache_size);
-	mem_cache_test_read(cache_size);
-	//i=cache_l3_size;
-	//ts_delta =0;
-	//ts_delta_all =0;
-	//while(i){
-	//	ts_delta = disorder_access(i);
-	//	ts_delta_all = ts_delta_all + ts_delta;
-	//	i--;
-	//}
-	//printf("%ld\n", ts_delta_all);
+	disorder_access_size(cache_size);
+	disorder_access_size(cache_size);
+	disorder_access_size(cache_size);
 	
 	asm volatile("mfence" ::: "memory");
 	asm volatile ("   wbinvd\n" : : : "memory");
@@ -690,7 +675,7 @@ void test_cache_type(void)
 	test_cache_type_wp(3);
 	for(i=0; i<1; i++)
 	{
-		test_cache_type_wt_wp();
+		test_cache_type_wt_wp(3);
 		//test_cache_type_wc_uc();
 	}
 #endif
@@ -1285,8 +1270,8 @@ void cache_test_case_map_to_none_linear(int time)
 		
 	//alloc_ops_tmp = alloc_ops;
 	//alloc_ops = &vmalloc_ops_none;
-	setup_mmu_range_tmp(phys_to_virt(read_cr3()), 1ul<<32, (1ul << 30)); //4G-5G  map to none
-	cache_test_array = (u64*) (1ul<<32);
+	setup_mmu_range_tmp(phys_to_virt(read_cr3()), 1ul<<36, (1ul << 30)); //64G-65G  map to none
+	cache_test_array = (u64*) (1ul<<36);
 	mem_cache_test_write_all(3);
 	mem_cache_test_read_all(3);
 	
@@ -1484,13 +1469,13 @@ int main(int ac, char **av)
 	//cache_test_case_invd();
 	//cache_test_case_CD_NW_control();
 	//cache_test_case_l3_control();
-	cache_test_case_clflush_001();
-	cache_test_case_clflush_002(41);
-	cache_test_case_clflush_003(41);
+	//cache_test_case_clflush_001();
+	//cache_test_case_clflush_002(41);
+	//cache_test_case_clflush_003(41);
 	
-	cache_test_case_clflushopt_001();
-	cache_test_case_clflushopt_002(41);
-	cache_test_case_clflushopt_003(41);
+	//cache_test_case_clflushopt_001();
+	//cache_test_case_clflushopt_002(41);
+	//cache_test_case_clflushopt_003(41);
 	//cache_test_case_l1_control();
 	//cache_test_case_MTRR_general();
 	//cache_test_case_MTRR_fixed();
@@ -1507,7 +1492,7 @@ int main(int ac, char **av)
 #ifdef __x86_64__
 	//cache_test_case_no_fill_cache(3);
 	//cache_test_case_map_to_device_linear(3);
-	cache_test_case_map_to_none_linear(3);
+	//cache_test_case_map_to_none_linear(3);	//blocking
 	//cache_test_case_map_to_memory_linear(3);
 #else
 	//cache_test_case_map_to_device_physical(3);
