@@ -198,6 +198,39 @@ static void write_cr4_bybit(u32 bit, u32 bitvalue)
 }
 */
 
+static void set_page_control_bit(void *gva,
+	page_level level, page_control_bit bit, u32 value)
+{
+	if (gva == NULL || level > PAGE_PDE) {
+		printf("this address is NULL or this is not 2 level page\n");
+		return;
+	}
+
+	u32 pde_offset = PGDIR_OFFSET((uintptr_t)gva, PAGE_PDE);
+	u32 pte_offset = PGDIR_OFFSET((uintptr_t)gva, PAGE_PTE);
+	ulong cr3 = read_cr3();
+	pteval_t *pde = (pgd_t *)cr3;
+
+	u32 *pte = pde[pde_offset] & ~(0xfff);
+
+	if (level == PAGE_PDE) {
+		if (value) {
+			pde[pde_offset] |= (1 << bit);
+		} else {
+			pde[pde_offset] &= ~(1 << bit);
+		}
+	} else {
+		if (value) {
+			pte[pte_offset] |= (1 << bit);
+		} else {
+			pte[pte_offset] &= ~(1 << bit);
+		}
+	}
+	asm volatile("invlpg %0\n\t"
+			"nop\n\t" : : "m"(*gva): "memory");
+
+}
+
 void disable_MTRR()
 {
 	u64 msr_value;
@@ -580,6 +613,7 @@ void test_cache_type_wt_wp()
 
 	debug_print("wt read cache_test_size %lx\n",cache_size);
 	asm volatile ("   wbinvd\n" : : : "memory");
+	mem_cache_test_read(cache_size);
 	mem_cache_test_write(cache_size);
 	
 	disorder_access_size(cache_size);
@@ -591,6 +625,7 @@ void test_cache_type_wt_wp()
 	mem_cache_test_set_type(PT_MEMORY_TYPE_MASK1);
 	debug_print("wp read cache_test_size %lx\n",cache_size);
 	asm volatile ("   wbinvd\n" : : : "memory");
+	mem_cache_test_read(cache_size);
 	mem_cache_test_write(cache_size);
 	
 	disorder_access_size(cache_size);
