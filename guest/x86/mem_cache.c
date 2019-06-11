@@ -198,6 +198,107 @@ static void write_cr4_bybit(u32 bit, u32 bitvalue)
 }
 */
 
+typedef enum page_control_bit{
+	PAGE_P_FLAG = 0,
+	PAGE_WRITE_READ_FLAG = 1,
+	PAGE_USER_SUPER_FLAG = 2,
+	PAGE_PWT_FLAG = 3,
+	PAGE_PCM_FLAG = 4,
+	PAGE_PS_FLAG = 7,
+}page_control_bit;
+
+typedef enum page_level{
+	PAGE_PTE = 1,
+	PAGE_PDE,
+	PAGE_PDPTE,
+	PAGE_PML4,
+}page_level;
+
+#if 1
+void set_page_control_bit(void *gva,
+	page_level level, page_control_bit bit, u32 value)
+{
+	if (gva == NULL) {
+		printf("this address is NULL!\n");
+		return;
+	}
+
+	ulong cr3 = read_cr3();
+#ifdef __x86_64__
+	u32 pdpte_offset = PGDIR_OFFSET((uintptr_t)gva, PAGE_PDPTE);
+	u32 pml4_offset = PGDIR_OFFSET((uintptr_t)gva, PAGE_PML4);
+	u32 pd_offset = PGDIR_OFFSET((uintptr_t)gva, PAGE_PDE);
+	u32 pt_offset = PGDIR_OFFSET((uintptr_t)gva, PAGE_PTE);
+	pteval_t *pml4 = (pteval_t *)cr3;
+
+	pteval_t *pdpte = (pteval_t *)(pml4[pml4_offset] & PAGE_MASK);
+	pteval_t *pd = (pteval_t *)(pdpte[pdpte_offset] & PAGE_MASK);
+	pteval_t *pt = (pteval_t *)(pd[pd_offset] & PAGE_MASK);
+
+	switch (level) {
+	case PAGE_PML4:
+		if (value) {
+			pml4[pml4_offset] |= (1 << bit);
+		} else {
+			pml4[pml4_offset] &= ~(1 << bit);
+		}
+		break;
+	case PAGE_PDPTE:
+		if (value) {
+			pdpte[pdpte_offset] |= (1 << bit);
+		} else {
+			pdpte[pdpte_offset] &= ~(1 << bit);
+		}
+		break;
+	case PAGE_PDE:
+		if (value) {
+			pd[pd_offset] |= (1 << bit);
+		} else {
+			pd[pd_offset] &= ~(1 << bit);
+		}
+		break;
+	case PAGE_PTE:
+		if (value) {
+			pt[pt_offset] |= (1 << bit);
+		} else {
+			pt[pt_offset] &= ~(1 << bit);
+		}
+		break;
+	}
+#if 1
+	if (value) {
+		pml4[pml4_offset] |= (1 << bit);
+		pdpte[pdpte_offset] |= (1 << bit);
+		pd[pd_offset] |= (1 << bit);
+		pt[pt_offset] |= (1 << bit);
+	}
+#endif
+	//printf("\n pte:%016x\n", pt[pt_offset]);
+#else
+	u32 pde_offset = PGDIR_OFFSET((uintptr_t)gva, PAGE_PDE);
+	u32 pte_offset = PGDIR_OFFSET((uintptr_t)gva, PAGE_PTE);
+	pteval_t *pde = (pgd_t *)cr3;
+
+	u32 *pte = pde[pde_offset] & PAGE_MASK;
+
+	if (level == PAGE_PDE) {
+		if (value) {
+			pde[pde_offset] |= (1 << bit);
+		} else {
+			pde[pde_offset] &= ~(1 << bit);
+		}
+	} else {
+		if (value) {
+			pte[pte_offset] |= (1 << bit);
+		} else {
+			pte[pte_offset] &= ~(1 << bit);
+		}
+	}
+#endif
+	asm volatile("invlpg %0\n\t"
+			"nop\n\t" : : "m"(*((uintptr_t*)gva)): "memory");
+}
+#else
 static void set_page_control_bit(void *gva,
 	page_level level, page_control_bit bit, u32 value)
 {
@@ -230,7 +331,7 @@ static void set_page_control_bit(void *gva,
 			"nop\n\t" : : "m"(*gva): "memory");
 
 }
-
+#endif
 void disable_MTRR()
 {
 	u64 msr_value;
