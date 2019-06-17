@@ -1239,7 +1239,7 @@ void cache_test_case_MTRR_VR(void)
 * ACRN hypervisor shall expose cache invalidation instructions to any VM, 
 * in compliance with Chapter 11.5.5, Vol. 3, SDM
 */
-void cache_test_case_invalidation(void)
+void cache_test_case_invalidation_001(void)
 {
 	debug_print("start invd\n");
 	asm volatile("mfence" ::: "memory");
@@ -1248,6 +1248,48 @@ void cache_test_case_invalidation(void)
 	debug_print("end invd\n");
 }
 
+void cache_test_case_invalidation_read(u64 size, int time)
+{
+	int i=0;
+
+	for(i=0; i<time; i++){
+		asm volatile ("wbinvd\n" : : : "memory");
+		mem_cache_test_read(size);
+	}
+}
+
+void cache_test_case_invalidation_disroder_read(u64 size, int time)
+{
+	int i=0;
+
+	for(i=0; i<time; i++){
+		asm volatile ("wbinvd\n" : : : "memory");
+		disorder_access_size(size);
+	}
+}
+
+void cache_test_case_invalidation_002(int time)
+{
+	//program MSR
+	mem_cache_test_set_type(PT_MEMORY_TYPE_MASK0);
+
+	debug_print("************ wb no wbinvd read***************\n");
+	mem_cache_test_read_time_invd(cache_l3_size, time);
+	
+	debug_print("************ wb wbinvd read***************\n");
+	cache_test_case_invalidation_read(cache_l3_size, time);
+}
+
+void cache_test_case_invalidation_003(int time)
+{
+	mem_cache_test_set_type(PT_MEMORY_TYPE_MASK0);
+	
+	debug_print("************ wb no wbinvd disorder read***************\n");
+	disorder_access_size_time(cache_l3_size, time);
+
+	debug_print("************ wb wbinvd disorder read***************\n");
+	cache_test_case_invalidation_disroder_read(cache_l3_size, time);
+}
 
 /*
 * ID:139251
@@ -1431,8 +1473,8 @@ void cache_test_case_map_to_none_physical(int time)
 
 	cache_test_disable_paging();
 
-	//setup_mmu_range_tmp(phys_to_virt(read_cr3()), 3ul << 30, (1ul << 30)); //3G-4G  map to none
-	cache_test_array = (u64*) (3ul << 30);
+	//setup_mmu_range_tmp(phys_to_virt(read_cr3()), 1ul<<36, (1ul << 30)); //64G-65G  map to none
+	cache_test_array = (u64*) (1ul<<36);
 	mem_cache_test_write_all(3);
 	mem_cache_test_read_all(3);
 	
@@ -1618,6 +1660,9 @@ int main(int ac, char **av)
 	//cache_test_case_MTRR_WC();
 	//cache_test_case_MTRR_SMRR();
 	//cache_test_case_MTRR_VR();
+	//cache_test_case_invalidation_001();
+	//cache_test_case_invalidation_002(41);
+	//cache_test_case_invalidation_003(41);
 	//cache_test_case_CLWB();
 	//cache_test_case_PREFETCHW();
 
@@ -1628,7 +1673,7 @@ int main(int ac, char **av)
 #ifdef __x86_64__
 	//cache_test_case_no_fill_cache(3);
 	//cache_test_case_map_to_device_linear(3);
-	//cache_test_case_map_to_none_linear(3);	//blocking
+	cache_test_case_map_to_none_linear(3);	//blocking
 	//cache_test_case_map_to_memory_linear(3);
 #else
 	//cache_test_case_map_to_device_physical(3);
