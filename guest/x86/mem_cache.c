@@ -1448,6 +1448,7 @@ void cache_test_case_map_to_none_linear(int time)
 		
 	//alloc_ops_tmp = alloc_ops;
 	//alloc_ops = &vmalloc_ops_none;
+	mem_cache_test_set_type(PT_MEMORY_TYPE_MASK4);	//UC
 	setup_mmu_range_tmp(phys_to_virt(read_cr3()), 1ul<<36, (1ul << 30)); //64G-65G  map to none
 	cache_test_array = (u64*) (1ul<<36);
 	mem_cache_test_write_all(3);
