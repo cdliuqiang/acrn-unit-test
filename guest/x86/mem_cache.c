@@ -14,6 +14,9 @@
 #include "alloc_page.h"
 #include "asm/io.h"
 #include "asm/spinlock.h"
+#include "pci.h"
+
+#include "pciUsb.c"
 
 #define USE_DEBUG
 #ifdef  USE_DEBUG
@@ -520,9 +523,10 @@ void mem_cache_test_write(u64 size)
 {
 	u64 index;
 	u64 t[2] = {0};
-	u64 tt = rdtsc_test();
 	u64 t_total=0;
-	
+
+	#if 0
+	u64 tt = rdtsc_test();
 	for(index=0; index<size; index++){
 		tt += index;
 		t[0] = rdtsc_test();
@@ -530,6 +534,14 @@ void mem_cache_test_write(u64 size)
 		t[1] = rdtsc_test();
 		t_total += t[1] - t[0];
 	}
+	#else
+	t[0] = rdtsc_test();
+	for(index=0; index<size; index++){
+		wraccess((unsigned long )&cache_test_array[index], index);
+	}
+	t[1] = rdtsc_test();
+	t_total += t[1] - t[0];
+	#endif
 	
 	printf("%ld\n", t_total);
 	asm volatile("mfence" ::: "memory");
@@ -550,6 +562,7 @@ void mem_cache_test_write_time_invd(u64 size, int time)
 void mem_cache_test_read_all(int time)
 {
 	debug_print("read ----------------------\n");
+	//mem_cache_test_read_time_invd(0x200, time);
 	//Cache size L1
 	mem_cache_test_read_time_invd(cache_l1_size, time);
 	//Cache size L2
@@ -658,6 +671,7 @@ static void setup_mmu_range_tmp(pgd_t *cr3, phys_addr_t start, size_t len)
 void mem_cache_test_write_all(int time)
 {
 	debug_print("write ----------------------\n");
+	//mem_cache_test_write_time_invd(0x200, time);
 	//Cache size L1
 	mem_cache_test_write_time_invd(cache_l1_size, time);
 	//Cache size L2
@@ -1424,14 +1438,14 @@ void cache_test_case_no_fill_cache(int time)
 void cache_test_case_map_to_device_linear(int time)
 {
 	//unsigned int tmp;
-	u64* regValue=0;
+	//u64* regValue=0;
 
 	debug_print("************map_to_device_linear***************\n");
-	//tmp = visitPciDev(NULL);
-	//regValue = (uintptr_t*)tmp;
 
-	cache_test_array = regValue;
-	mem_cache_test_write_time_invd((0x4FF0/8), time);
+	visitPciDev((void * )&cache_test_array);
+	cache_test_array +=601;	// 601*8=0x3008
+	mem_cache_test_write_time_invd(0x200, 41);
+	mem_cache_test_read_time_invd(0x200, 41);
 }
 
 
@@ -1754,7 +1768,7 @@ void cache_test_case_clflush_exception_002(void)
 }
 
 /*64bit mode page fault   PF
-fail
+Hypervisor PF ok 	----need setup_vm()
 */
 void cache_test_case_clflush_exception_003(void)
 {
@@ -1762,10 +1776,10 @@ void cache_test_case_clflush_exception_003(void)
 
 	debug_print("\n");
 	mem_cache_test_read_time_invd(cache_l1_size, 1);
-	address = (u64)&cache_test_array;
-	address = (((address) + (PAGE_SIZE-1)) & ~(PAGE_SIZE-1)); //page algin
+	address = (u64)cache_test_array;
+	//address = (((address) + (PAGE_SIZE-1)) & ~(PAGE_SIZE-1)); //page algin
 
-	//set_page_control_bit((void *)address, PAGE_PTE, 0, 0);// not present
+	set_page_control_bit((void *)address, PAGE_PTE, 0, 0);// not present
 	cache_test_case_clflush_all_line(cache_l1_size);
 }
 
@@ -1832,10 +1846,10 @@ void cache_test_case_clflush_exception_010(void)
 void clflush_exception_test()
 {
 #ifdef __x86_64__
-	cache_test_case_clflush_exception_001(); //ok
+	//cache_test_case_clflush_exception_001(); //ok
 	cache_test_case_clflush_exception_002(); //fail
-	cache_test_case_clflush_exception_003(); //fail
-	cache_test_case_clflush_exception_004(); //ok
+	//cache_test_case_clflush_exception_003(); //ok
+	//cache_test_case_clflush_exception_004(); //ok
 #elif defined(__i386__)
 	cache_test_case_clflush_exception_005();
 	cache_test_case_clflush_exception_006();
@@ -1900,7 +1914,7 @@ void cache_test_case_clflushopt_exception_001(void)
 }
 
 /*64bit mode non-canonical   SS   SS segment
-* fail
+* fail   only GP
 */
 void cache_test_case_clflushopt_exception_002(void)
 {
@@ -1918,17 +1932,19 @@ void cache_test_case_clflushopt_exception_002(void)
 }
 
 /*64bit mode page fault   PF
-* fail
+* Hypervisor PF ok   ---need setup_vm()
 */
 void cache_test_case_clflushopt_exception_003(void)
 {
 	u64 address=0;
 
 	debug_print("\n");
-	mem_cache_test_read_time_invd(cache_l1_size, 1);
-	address = (u64)&cache_test_array;
-	address = (((address) + (PAGE_SIZE-1)) & ~(PAGE_SIZE-1)); //page algin
 
+	//mem_cache_test_read_time_invd(cache_l1_size, 1);
+	address = (u64)&cache_test_array[0];
+	//address = (((address) + (PAGE_SIZE-1)) & ~(PAGE_SIZE-1)); //page algin
+
+	debug_print("%lx\n", address);
 	set_page_control_bit((void *)address, PAGE_PTE, 0, 0);// not present
 	cache_test_case_clflushopt_all_line(cache_l1_size);
 }
@@ -2051,12 +2067,12 @@ void cache_test_case_clflushopt_exception_016(void)
 void clflushopt_exception_test()
 {
 #ifdef __x86_64__
-	cache_test_case_clflushopt_exception_001();	//ok
+	//cache_test_case_clflushopt_exception_001();	//ok
 	cache_test_case_clflushopt_exception_002();	//fail
-	cache_test_case_clflushopt_exception_003();	//fail
-	cache_test_case_clflushopt_exception_004();	//ok
-	cache_test_case_clflushopt_exception_005();	//ok
-	cache_test_case_clflushopt_exception_014();	//ok
+	//cache_test_case_clflushopt_exception_003();	//ok
+	//cache_test_case_clflushopt_exception_004();	//ok
+	//cache_test_case_clflushopt_exception_005();	//ok
+	//cache_test_case_clflushopt_exception_014();	//ok
 #elif defined(__i386__)
 	cache_test_case_clflushopt_exception_006();
 	cache_test_case_clflushopt_exception_007();
@@ -2076,8 +2092,8 @@ void exception_test()
 {
 	//wbinvd_exception_test();
 	//invd_exception_test();
-	//clflush_exception_test();
-	clflushopt_exception_test();
+	clflush_exception_test();
+	//clflushopt_exception_test();
 }
 
 #if 0
@@ -2126,6 +2142,8 @@ static uint64_t native_calibrate_tsc(void)
 	return tsc_hz;
 }
 #define min(x, y)	((x) < (y)) ? (x) : (y)
+
+#if 0
 /* Write 1 byte to specified I/O port */
 static inline void pio_write8(uint8_t value, uint16_t port)
 {
@@ -2139,7 +2157,7 @@ static inline uint8_t pio_read8(uint16_t port)
 	asm volatile ("inb %1,%0":"=a" (value):"dN"(port));
 	return value;
 }
-
+#endif
 static uint64_t pit_calibrate_tsc(uint32_t cal_ms_arg)
 {
 #define PIT_TICK_RATE	1193182U
@@ -2205,15 +2223,15 @@ void calibrate_tsc(void)
 
 int main(int ac, char **av)
 {
-#if 1	//wbinvd invd ring3 need
+#if 0	//wbinvd invd ring3 need
 	extern unsigned char kernel_entry;
 
 	setup_idt();
 	set_idt_entry(0x20, &kernel_entry, 3);
 #endif
 	//default PAT entry value 0007040600070406
-	//mem_cache_test_set_type_all(0x0000000001040506);
-	//setup_vm();
+	mem_cache_test_set_type_all(0x0000000001040506);
+	setup_vm();
 	//setup_idt();
 	//smp_init();
 	//setup_idt();
@@ -2266,9 +2284,9 @@ int main(int ac, char **av)
 	//cache_test_case_map_to_device_physical(3);
 	//cache_test_case_map_to_none_physical(3);
 #endif
-	exception_test();
+	//exception_test();
 	debug_print("mem cache control memory malloc success\n");
-	//test_cache_type();
+	test_cache_type();
 
 	//free(cache_test_array);
 	//cache_test_array = NULL;
