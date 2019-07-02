@@ -134,6 +134,31 @@ static void wraccess(unsigned long address, unsigned long value)
 	//asm volatile("mfence" ::: "memory");
 }
 
+void cache_test_wbinvd()
+{
+	asm volatile ("wbinvd\n" : : : "memory");
+}
+
+void cache_test_mfence_wbinvd()
+{
+	asm volatile("mfence" ::: "memory");
+	asm volatile ("   wbinvd\n" : : : "memory");
+	asm volatile("mfence" ::: "memory");
+}
+
+void cache_test_invd()
+{
+	asm volatile ("invd\n" : : : "memory");
+}
+
+void cache_test_mfence_invd()
+{
+	asm volatile("mfence" ::: "memory");
+	asm volatile ("invd\n" : : : "memory");
+	asm volatile("mfence" ::: "memory");
+}
+
+
 u64 disorder_access(u64 index, u64 size)
 {
     int i=0;
@@ -377,7 +402,7 @@ void mem_cache_reflush_cache()
 	//disable and flush caches;
 	write_cr0_bybit(CR0_BIT_CD, 1);
 	write_cr0_bybit(CR0_BIT_NW, 0);
-	asm volatile ("   wbinvd\n" : : : "memory");
+	cache_test_wbinvd();
 
 	//flush TLBs;
 	flush_tlb();
@@ -386,7 +411,7 @@ void mem_cache_reflush_cache()
 	disable_MTRR();
 
 	//flush caches and TLBs
-	asm volatile ("   wbinvd\n" : : : "memory");
+	cache_test_wbinvd();
 	flush_tlb();
 
 	//enable MTRRs;
@@ -442,7 +467,7 @@ void mem_cache_test_set_type(u64 cache_type)
 	debug_print("cache_test_array=%p\n", cache_test_array);
 	
 	//flush caches and TLBs
-	asm volatile ("   wbinvd\n" : : : "memory");
+	cache_test_wbinvd();
 	flush_tlb();
 }
 
@@ -460,9 +485,7 @@ void mem_cache_test_set_type_all(u64 cache_type)
 	else
 		debug_print("set pat type all sucess type=0x%lx\n", cache_type);
 
-	asm volatile("mfence" ::: "memory");
-	asm volatile ("   wbinvd\n" : : : "memory");
-	asm volatile("mfence" ::: "memory");	
+	cache_test_mfence_wbinvd();
 
 	mem_cache_reflush_cache();
 }
@@ -490,9 +513,7 @@ void mem_cache_test_read_time_invd(u64 size, int time)
 		mem_cache_test_read(size);
 	}
 	
-	asm volatile("mfence" ::: "memory");
-	asm volatile ("   wbinvd\n" : : : "memory");
-	asm volatile("mfence" ::: "memory");	
+	cache_test_mfence_wbinvd();
 }
 
 void mem_cache_test_write(u64 size)
@@ -522,9 +543,7 @@ void mem_cache_test_write_time_invd(u64 size, int time)
 		mem_cache_test_write(size);
 	}
 	
-	asm volatile("mfence" ::: "memory");
-	asm volatile ("   wbinvd\n" : : : "memory");
-	asm volatile("mfence" ::: "memory");
+	cache_test_mfence_wbinvd();
 }
 
 
@@ -532,13 +551,13 @@ void mem_cache_test_read_all(int time)
 {
 	debug_print("read ----------------------\n");
 	//Cache size L1
-	//mem_cache_test_read_time_invd(cache_l1_size, time);
+	mem_cache_test_read_time_invd(cache_l1_size, time);
 	//Cache size L2
-	//mem_cache_test_read_time_invd(cache_l2_size, time);
+	mem_cache_test_read_time_invd(cache_l2_size, time);
 	//Cache size L3
 	mem_cache_test_read_time_invd(cache_l3_size, time);
 	//Cache size over L3
-	//mem_cache_test_read_time_invd(cache_over_l3_size, time);
+	mem_cache_test_read_time_invd(cache_over_l3_size, time);
 	//Cache size over L3 2
 	//mem_cache_test_read_time_invd(cache_over_l3_size2, time);
 }
@@ -640,13 +659,13 @@ void mem_cache_test_write_all(int time)
 {
 	debug_print("write ----------------------\n");
 	//Cache size L1
-	//mem_cache_test_write_time_invd(cache_l1_size, time);
+	mem_cache_test_write_time_invd(cache_l1_size, time);
 	//Cache size L2
-	//mem_cache_test_write_time_invd(cache_l2_size, time);
+	mem_cache_test_write_time_invd(cache_l2_size, time);
 	//Cache size L3
 	mem_cache_test_write_time_invd(cache_l3_size, time);
 	//Cache size over L3
-	//mem_cache_test_write_time_invd(cache_over_l3_size, time);
+	mem_cache_test_write_time_invd(cache_over_l3_size, time);
 	//Cache size over L3 2
 	//mem_cache_test_write_time_invd(cache_over_l3_size2, time);
 
@@ -713,7 +732,7 @@ void test_cache_type_wt_wp()
 	mem_cache_test_set_type(PT_MEMORY_TYPE_MASK2);
 
 	debug_print("wt read cache_test_size %lx\n",cache_size);
-	asm volatile ("   wbinvd\n" : : : "memory");
+	cache_test_wbinvd();
 	mem_cache_test_read(cache_size);
 	mem_cache_test_write(cache_size);
 	
@@ -725,7 +744,7 @@ void test_cache_type_wt_wp()
 	////////////////////////////////
 	mem_cache_test_set_type(PT_MEMORY_TYPE_MASK1);
 	debug_print("wp read cache_test_size %lx\n",cache_size);
-	asm volatile ("   wbinvd\n" : : : "memory");
+	cache_test_wbinvd();
 	mem_cache_test_read(cache_size);
 	mem_cache_test_write(cache_size);
 	
@@ -733,9 +752,7 @@ void test_cache_type_wt_wp()
 	disorder_access_size(cache_size);
 	disorder_access_size(cache_size);
 	
-	asm volatile("mfence" ::: "memory");
-	asm volatile ("   wbinvd\n" : : : "memory");
-	asm volatile("mfence" ::: "memory");
+	cache_test_mfence_wbinvd();
 }
 
 #if 0
@@ -898,9 +915,7 @@ void cache_test_case_cpuid4()
 void cache_test_case_invd()
 {
 	debug_print("start invd\n");
-	asm volatile("mfence" ::: "memory");
-	asm volatile ("invd\n" : : : "memory");
-	asm volatile("mfence" ::: "memory");
+	cache_test_mfence_invd();
 	debug_print("end invd\n");
 }
 
@@ -1039,7 +1054,8 @@ void cache_test_case_clflushopt_all_line(u64 size)
 	int i;
 
 	for(i=0; i<size; i++){
-		asm volatile(".byte 0x66, 0x0f, 0xae, 0x3b" : : "b" (&cache_test_array[i]));
+		//asm volatile(".byte 0x66, 0x0f, 0xae, 0x3b" : : "b" (&cache_test_array[i]));
+		asm volatile("clflushopt (%0)" : : "b" (&cache_test_array[i]));
 	}
 }
 
@@ -1242,9 +1258,7 @@ void cache_test_case_MTRR_VR(void)
 void cache_test_case_invalidation_001(void)
 {
 	debug_print("start invd\n");
-	asm volatile("mfence" ::: "memory");
-	asm volatile ("wbinvd\n" : : : "memory");
-	asm volatile("mfence" ::: "memory");
+	cache_test_mfence_wbinvd();
 	debug_print("end invd\n");
 }
 
@@ -1253,7 +1267,7 @@ void cache_test_case_invalidation_read(u64 size, int time)
 	int i=0;
 
 	for(i=0; i<time; i++){
-		asm volatile ("wbinvd\n" : : : "memory");
+		cache_test_wbinvd();
 		mem_cache_test_read(size);
 	}
 }
@@ -1263,7 +1277,7 @@ void cache_test_case_invalidation_disroder_read(u64 size, int time)
 	int i=0;
 
 	for(i=0; i<time; i++){
-		asm volatile ("wbinvd\n" : : : "memory");
+		cache_test_wbinvd();
 		disorder_access_size(size);
 	}
 }
@@ -1371,7 +1385,7 @@ void cache_test_disable_paging()
 	debug_print("CR0 = 0x%x\n", cr0);
 	
 	//flush caches and TLBs
-	asm volatile ("   wbinvd\n" : : : "memory");
+	cache_test_wbinvd();
 	flush_tlb();
 }
 
@@ -1409,7 +1423,15 @@ void cache_test_case_no_fill_cache(int time)
 */
 void cache_test_case_map_to_device_linear(int time)
 {
+	//unsigned int tmp;
+	u64* regValue=0;
+
 	debug_print("************map_to_device_linear***************\n");
+	//tmp = visitPciDev(NULL);
+	//regValue = (uintptr_t*)tmp;
+
+	cache_test_array = regValue;
+	mem_cache_test_write_time_invd((0x4FF0/8), time);
 }
 
 
@@ -1451,8 +1473,8 @@ void cache_test_case_map_to_none_linear(int time)
 	mem_cache_test_set_type(PT_MEMORY_TYPE_MASK4);	//UC
 	setup_mmu_range_tmp(phys_to_virt(read_cr3()), 1ul<<36, (1ul << 30)); //64G-65G  map to none
 	cache_test_array = (u64*) (1ul<<36);
-	mem_cache_test_write_all(3);
-	mem_cache_test_read_all(3);
+	mem_cache_test_write_all(41);
+	mem_cache_test_read_all(41);
 	
 	//alloc_ops = alloc_ops_tmp;
 	cache_test_array = tmp;
@@ -1498,6 +1520,564 @@ void cache_test_case_map_to_memory_linear(int time)
 
 	mem_cache_test_write_all(time);
 	mem_cache_test_read_all(time);
+}
+
+/*
+* ID:139243
+* Name:Cache control cache invalidation instructions[exception]
+* ACRN hypervisor shall expose cache invalidation instructions to any VM, 
+* in compliance with Chapter 11.5.5, Vol. 3, SDM
+*/
+static int do_at_ring3(void (*fn)(void), const char *arg)
+{
+	static unsigned char user_stack[4096];
+	int ret;
+
+	asm volatile ("mov %[user_ds], %%" R "dx\n\t"
+		  "mov %%dx, %%ds\n\t"
+		  "mov %%dx, %%es\n\t"
+		  "mov %%dx, %%fs\n\t"
+		  "mov %%dx, %%gs\n\t"
+		  "mov %%" R "sp, %%" R "cx\n\t"
+		  "push" W " %%" R "dx \n\t"
+		  "lea %[user_stack_top], %%" R "dx \n\t"
+		  "push" W " %%" R "dx \n\t"
+		  "pushf" W "\n\t"
+		  "push" W " %[user_cs] \n\t"
+		  "push" W " $1f \n\t"
+		  "iret" W "\n"
+		  "1: \n\t"
+		  "push %%" R "cx\n\t"   /* save kernel SP */
+
+#ifndef __x86_64__
+		  "push %[arg]\n\t"
+#endif
+		  "call *%[fn]\n\t"
+#ifndef __x86_64__
+		  "pop %%ecx\n\t"
+#endif
+
+		  "pop %%" R "cx\n\t"
+		  "mov $1f, %%" R "dx\n\t"
+		  "int %[kernel_entry_vector]\n\t"
+		  ".section .text.entry \n\t"
+		  "kernel_entry: \n\t"
+		  "mov %%" R "cx, %%" R "sp \n\t"
+		  "mov %[kernel_ds], %%cx\n\t"
+		  "mov %%cx, %%ds\n\t"
+		  "mov %%cx, %%es\n\t"
+		  "mov %%cx, %%fs\n\t"
+		  "mov %%cx, %%gs\n\t"
+		  "jmp *%%" R "dx \n\t"
+		  ".section .text\n\t"
+		  "1:\n\t"
+		  : [ret] "=&a" (ret)
+		  : [user_ds] "i" (USER_DS),
+		    [user_cs] "i" (USER_CS),
+		    [user_stack_top]"m"(user_stack[sizeof user_stack]),
+		    [fn]"r"(fn),
+		    [arg]"D"(arg),
+		    [kernel_ds]"i"(KERNEL_DS),
+		    [kernel_entry_vector]"i"(0x20)
+		  : "rcx", "rdx");
+	return ret;
+}
+
+#ifdef __x86_64__
+/*64bit mode ring 3   GP
+* Hypervisor GP ok
+*/
+void cache_test_case_invalidation_exception_001(void)
+{
+	debug_print("\n");
+	do_at_ring3(cache_test_wbinvd, "");
+}
+
+/*64bit mode LOCK prefix F0   UD
+* Hypervisor UD ok
+*/
+void cache_test_case_invalidation_exception_002(void) 
+{
+	debug_print("\n");
+	asm volatile(".byte 0xF0\n\t" "wbinvd\n\t" : :);
+	//asm volatile(".byte 0xF0, 0x0F, 0x09" : :);
+}
+#elif defined(__i386__)
+/*protected mode ring 3   GP*/
+void cache_test_case_invalidation_exception_003(void)
+{
+	debug_print("\n");
+	do_at_ring3(cache_test_wbinvd, "");
+}
+
+/*protected mode LOCK prefix F0   UD*/
+void cache_test_case_invalidation_exception_004(void)
+{
+	debug_print("\n");
+	asm volatile(".byte 0xF0\n\t" "wbinvd\n\t" : :);
+}
+#else
+/*real mode LOCK prefix F0   UD*/
+void cache_test_case_invalidation_exception_005(void)
+{
+	debug_print("\n");
+	asm volatile(".byte 0xF0\n\t" "wbinvd\n\t" : :);
+}
+#endif
+void wbinvd_exception_test()
+{
+#ifdef __x86_64__
+	cache_test_case_invalidation_exception_001();//ok
+	cache_test_case_invalidation_exception_002();//ok
+#elif defined(__i386__)
+	cache_test_case_invalidation_exception_003();
+	cache_test_case_invalidation_exception_004();
+#else
+	cache_test_case_invalidation_exception_005();
+#endif
+}
+
+#ifdef __x86_64__
+/*64bit mode ring 3   GP
+* Hypervisor GP ok
+*/
+void cache_test_case_invd_exception_001(void)
+{
+	debug_print("\n");
+	do_at_ring3(cache_test_invd, "");
+}
+
+/*64bit mode LOCK prefix F0   UD
+Hypervisor UD ok
+*/
+void cache_test_case_invd_exception_002(void)
+{
+	debug_print("\n");
+	//asm volatile(".byte 0xF0, 0x0f, 0x08" : :);
+	asm volatile(".byte 0xF0\n\t" "invd" : :);
+}
+#elif defined(__i386__)
+/*protected mode ring 3   GP*/
+void cache_test_case_invd_exception_003(void)
+{
+	debug_print("\n");
+	do_at_ring3(cache_test_invd, "");
+}
+
+/*protected mode LOCK prefix F0   UD*/
+void cache_test_case_invd_exception_004(void)
+{
+	debug_print("\n");
+	//asm volatile(".byte 0xF0, 0x0f, 0x08" : :);
+	asm volatile(".byte 0xF0\n\t" "invd" : :);
+}
+#else
+/*real mode LOCK prefix F0   UD*/
+void cache_test_case_invd_exception_005(void)
+{
+	debug_print("\n");
+	//asm volatile(".byte 0xF0, 0x0f, 0x08" : :);
+	asm volatile(".byte 0xF0\n\t" "invd" : :);
+}
+#endif
+
+void invd_exception_test()
+{
+#ifdef __x86_64__
+	cache_test_case_invd_exception_001();//ok
+	cache_test_case_invd_exception_002();//ok
+#elif defined(__i386__)
+	cache_test_case_invd_exception_003();
+	cache_test_case_invd_exception_004();
+#else
+	cache_test_case_invd_exception_005();
+#endif
+}
+
+
+/*bit 63 set to 1
+*/
+void cache_test_case_clflush_all_line_non_canonical(u64 size)
+{
+	int i;
+	unsigned long address;
+
+	for(i=0; i<size; i++){
+		address = (unsigned long)(&cache_test_array[i]);
+		address = (address|(1UL<<63));
+		printf("%lx\n", address);
+		asm volatile("clflush (%0)" : : "b" (address));
+	}
+}
+
+void cache_test_case_clflush_all_line_lock_prefix(u64 size)
+{
+	int i=0;
+
+	for(i=0; i<size; i++){
+		asm volatile(".byte 0xF0\n\t" "clflush (%0)" : : "b" (&cache_test_array[i]));
+	}
+}
+
+#ifdef __x86_64__
+/*64bit mode non-canonical   GP
+* Hypervisor GP ok
+*/
+void cache_test_case_clflush_exception_001(void)
+{
+	debug_print("\n");
+	mem_cache_test_read_time_invd(cache_l1_size, 1);
+	cache_test_case_clflush_all_line_non_canonical(cache_l1_size);
+}
+
+/*64bit mode non-canonical   SS   SS segment
+* fail  only GP
+*/
+void cache_test_case_clflush_exception_002(void)
+{
+	u64 ss_mem;
+	u64 address=0;
+
+	ss_mem = 0x1122334455667788;
+
+	address = (unsigned long)(&ss_mem);
+	address = (address|(1UL<<63));
+	printf("%lx\n", address);
+
+	//debug_print("%p %lx\n", &ss_mem, address);
+	//asm volatile("movq %%rsp, %0\n" :"=m"(address) ::"memory");
+	//asm volatile("movq %0,%%rsp\n": :"r"(address): "memory");
+	//debug_print("%p %lx\n", &ss_mem, address);
+
+	//asm volatile("clflush %%rsp" : : );
+	asm volatile("clflush (%0)" : : "b" (address));
+}
+
+/*64bit mode page fault   PF
+fail
+*/
+void cache_test_case_clflush_exception_003(void)
+{
+	u64 address=0;
+
+	debug_print("\n");
+	mem_cache_test_read_time_invd(cache_l1_size, 1);
+	address = (u64)&cache_test_array;
+	address = (((address) + (PAGE_SIZE-1)) & ~(PAGE_SIZE-1)); //page algin
+
+	//set_page_control_bit((void *)address, PAGE_PTE, 0, 0);// not present
+	cache_test_case_clflush_all_line(cache_l1_size);
+}
+
+/*64bit mode LOCK prefix   UD
+* Hypervisor UD
+*/
+void cache_test_case_clflush_exception_004(void)
+{
+	debug_print("\n");
+	mem_cache_test_read_time_invd(cache_l1_size, 1);
+	cache_test_case_clflush_all_line_lock_prefix(cache_l1_size);
+}
+
+#elif defined(__i386__)
+/*protected mode  For an illegal memory operand effective address in the CS, DS, ES, FS or GS segments   GP(0)*/
+void cache_test_case_clflush_exception_005(void)
+{
+	debug_print("\n");
+}
+
+/*protected mode  For an illegal address in the SS segment SS(0)*/
+void cache_test_case_clflush_exception_006(void)
+{
+	debug_print("\n");
+}
+
+/*protected mode page fault   PF*/
+void cache_test_case_clflush_exception_007(void)
+{
+	u32 address=0;
+
+	debug_print("\n");
+	mem_cache_test_read_time_invd(cache_l1_size, 1);
+	address = (u32)&cache_test_array;
+	address = (((address) + (PAGE_SIZE-1)) & ~(PAGE_SIZE-1)); //page algin
+
+	set_page_control_bit((void *)address, PAGE_PTE, 0, 0);// not present
+	cache_test_case_clflush_all_line(cache_l1_size);
+}
+
+/*protected mode LOCK prefix   UD*/
+void cache_test_case_clflush_exception_008(void)
+{
+	debug_print("\n");
+	mem_cache_test_read_time_invd(cache_l1_size, 1);
+	cache_test_case_clflush_all_line_lock_prefix(cache_l1_size);
+}
+#else
+/*real mode If any part of the operand lies outside the effective address space from 0 to FFFFH. GP*/
+void cache_test_case_clflush_exception_009(void)
+{
+	debug_print("\n");
+}
+
+/*real mode LOCK prefix   UD*/
+void cache_test_case_clflush_exception_010(void)
+{
+	debug_print("\n");
+	mem_cache_test_read_time_invd(cache_l1_size, 1);
+	cache_test_case_clflush_all_line_lock_prefix(cache_l1_size);
+}
+#endif
+
+void clflush_exception_test()
+{
+#ifdef __x86_64__
+	cache_test_case_clflush_exception_001(); //ok
+	cache_test_case_clflush_exception_002(); //fail
+	cache_test_case_clflush_exception_003(); //fail
+	cache_test_case_clflush_exception_004(); //ok
+#elif defined(__i386__)
+	cache_test_case_clflush_exception_005();
+	cache_test_case_clflush_exception_006();
+	cache_test_case_clflush_exception_007();
+	cache_test_case_clflush_exception_008();
+#else
+	cache_test_case_clflush_exception_009();
+	cache_test_case_clflush_exception_010();
+#endif
+}
+
+/*bit 63 set to 1*/
+void cache_test_case_clflushopt_all_line_non_canonical(u64 size)
+{
+	int i;
+	unsigned long address;
+
+	for(i=0; i<size; i++){
+		address = (unsigned long)(&cache_test_array[i]);
+		address = (address|(1UL<<63));
+		printf("%lx\n", address);
+		asm volatile("clflushopt (%0)" : : "b" (address));
+	}
+}
+
+void cache_test_case_clflushopt_all_line_lock_prefix_F0(u64 size)
+{
+	int i=0;
+
+	for(i=0; i<size; i++){
+		asm volatile(".byte 0xF0\n\t" "clflushopt (%0)" : : "b" (&cache_test_array[i]));
+	}
+}
+
+void cache_test_case_clflushopt_all_line_lock_prefix_F2(u64 size)
+{
+	int i=0;
+
+	for(i=0; i<size; i++){
+		asm volatile(".byte 0xF2\n\t" "clflushopt (%0)" : : "b" (&cache_test_array[i]));
+	}
+}
+
+void cache_test_case_clflushopt_all_line_lock_prefix_F3(u64 size)
+{
+	int i=0;
+
+	for(i=0; i<size; i++){
+		asm volatile(".byte 0xF3\n\t" "clflushopt (%0)" : : "b" (&cache_test_array[i]));
+	}
+}
+
+#ifdef __x86_64__
+/*64bit mode non-canonical   GP
+Hypervisor GP OK
+*/
+void cache_test_case_clflushopt_exception_001(void)
+{
+	debug_print("\n");
+	mem_cache_test_read_time_invd(cache_l1_size, 1);
+	cache_test_case_clflushopt_all_line_non_canonical(cache_l1_size);
+}
+
+/*64bit mode non-canonical   SS   SS segment
+* fail
+*/
+void cache_test_case_clflushopt_exception_002(void)
+{
+	u64 ss_mem;
+	unsigned long address;
+
+	debug_print("\n");
+	ss_mem = 0x1122334455667788;
+
+	address = (unsigned long)(&ss_mem);
+	address = (address|(1UL<<63));
+	printf("%lx\n", address);
+
+	asm volatile("clflushopt (%0)" : : "b" (address));
+}
+
+/*64bit mode page fault   PF
+* fail
+*/
+void cache_test_case_clflushopt_exception_003(void)
+{
+	u64 address=0;
+
+	debug_print("\n");
+	mem_cache_test_read_time_invd(cache_l1_size, 1);
+	address = (u64)&cache_test_array;
+	address = (((address) + (PAGE_SIZE-1)) & ~(PAGE_SIZE-1)); //page algin
+
+	set_page_control_bit((void *)address, PAGE_PTE, 0, 0);// not present
+	cache_test_case_clflushopt_all_line(cache_l1_size);
+}
+
+/*64bit mode LOCK prefix F2  UD
+Hypervisor UD ok
+*/
+void cache_test_case_clflushopt_exception_004(void)
+{
+	debug_print("\n");
+	mem_cache_test_read_time_invd(cache_l1_size, 1);
+	cache_test_case_clflushopt_all_line_lock_prefix_F2(cache_l1_size);
+}
+
+/*64bit mode LOCK prefix F3  UD
+Hypervisor UD ok
+*/
+void cache_test_case_clflushopt_exception_005(void)
+{
+	debug_print("\n");
+	mem_cache_test_read_time_invd(cache_l1_size, 1);
+	cache_test_case_clflushopt_all_line_lock_prefix_F3(cache_l1_size);
+}
+
+/*64bit mode LOCK prefix  F0 UD
+Hypervisor UD oks
+*/
+void cache_test_case_clflushopt_exception_014(void)
+{
+	debug_print("\n");
+	mem_cache_test_read_time_invd(cache_l1_size, 1);
+	cache_test_case_clflushopt_all_line_lock_prefix_F0(cache_l1_size);
+}
+
+#elif defined(__i386__)
+/*protected mode  For an illegal memory operand effective address in the CS, DS, ES, FS or GS segments   GP(0)*/
+void cache_test_case_clflushopt_exception_006(void)
+{
+	debug_print("\n");
+}
+
+/*protected mode  For an illegal address in the SS segment SS(0)*/
+void cache_test_case_clflushopt_exception_007(void)
+{
+	debug_print("\n");
+}
+
+/*protected mode page fault   PF*/
+void cache_test_case_clflushopt_exception_008(void)
+{
+	u32 address=0;
+
+	debug_print("\n");
+	mem_cache_test_read_time_invd(cache_l1_size, 1);
+	address = (u32)&cache_test_array;
+	address = (((address) + (PAGE_SIZE-1)) & ~(PAGE_SIZE-1)); //page algin
+
+	set_page_control_bit((void *)address, PAGE_PTE, 0, 0);// not present
+	cache_test_case_clflushopt_all_line(cache_l1_size);
+}
+
+/*protected mode LOCK prefix  F2 UD*/
+void cache_test_case_clflushopt_exception_009(void)
+{
+	debug_print("\n");
+	mem_cache_test_read_time_invd(cache_l1_size, 1);
+	cache_test_case_clflushopt_all_line_lock_prefix_F2(cache_l1_size);
+}
+
+/*protected mode LOCK prefix  F3 UD*/
+void cache_test_case_clflushopt_exception_010(void)
+{
+	debug_print("\n");
+	mem_cache_test_read_time_invd(cache_l1_size, 1);
+	cache_test_case_clflushopt_all_line_lock_prefix_F3(cache_l1_size);
+}
+
+/*protected mode LOCK prefix  F0 UD*/
+void cache_test_case_clflushopt_exception_015(void)
+{
+	debug_print("\n");
+	mem_cache_test_read_time_invd(cache_l1_size, 1);
+	cache_test_case_clflushopt_all_line_lock_prefix_F0(cache_l1_size);
+}
+
+#else
+/*real mode If any part of the operand lies outside the effective address space from 0 to FFFFH. GP*/
+void cache_test_case_clflushopt_exception_011(void)
+{
+	debug_print("\n");
+}
+
+/*real mode LOCK prefix  F2 UD*/
+void cache_test_case_clflushopt_exception_012(void)
+{
+	debug_print("\n");
+	mem_cache_test_read_time_invd(cache_l1_size, 1);
+	cache_test_case_clflushopt_all_line_lock_prefix_F2(cache_l1_size);
+}
+
+/*real mode LOCK prefix  F3 UD*/
+void cache_test_case_clflushopt_exception_013(void)
+{
+	debug_print("\n");
+	mem_cache_test_read_time_invd(cache_l1_size, 1);
+	cache_test_case_clflushopt_all_line_lock_prefix_F3(cache_l1_size);
+}
+
+/*real mode LOCK prefix  F0 UD*/
+void cache_test_case_clflushopt_exception_016(void)
+{
+	debug_print("\n");
+	mem_cache_test_read_time_invd(cache_l1_size, 1);
+	cache_test_case_clflushopt_all_line_lock_prefix_F0(cache_l1_size);
+}
+
+#endif
+
+
+void clflushopt_exception_test()
+{
+#ifdef __x86_64__
+	cache_test_case_clflushopt_exception_001();	//ok
+	cache_test_case_clflushopt_exception_002();	//fail
+	cache_test_case_clflushopt_exception_003();	//fail
+	cache_test_case_clflushopt_exception_004();	//ok
+	cache_test_case_clflushopt_exception_005();	//ok
+	cache_test_case_clflushopt_exception_014();	//ok
+#elif defined(__i386__)
+	cache_test_case_clflushopt_exception_006();
+	cache_test_case_clflushopt_exception_007();
+	cache_test_case_clflushopt_exception_008();
+	cache_test_case_clflushopt_exception_009();
+	cache_test_case_clflushopt_exception_010();
+	cache_test_case_clflushopt_exception_015();
+#else
+	cache_test_case_clflushopt_exception_011();
+	cache_test_case_clflushopt_exception_012();
+	cache_test_case_clflushopt_exception_013();
+	cache_test_case_clflushopt_exception_016();
+#endif
+}
+
+void exception_test()
+{
+	//wbinvd_exception_test();
+	//invd_exception_test();
+	//clflush_exception_test();
+	clflushopt_exception_test();
 }
 
 #if 0
@@ -1625,9 +2205,15 @@ void calibrate_tsc(void)
 
 int main(int ac, char **av)
 {
+#if 1	//wbinvd invd ring3 need
+	extern unsigned char kernel_entry;
+
+	setup_idt();
+	set_idt_entry(0x20, &kernel_entry, 3);
+#endif
 	//default PAT entry value 0007040600070406
-	mem_cache_test_set_type_all(0x0000000001040506);
-	setup_vm();
+	//mem_cache_test_set_type_all(0x0000000001040506);
+	//setup_vm();
 	//setup_idt();
 	//smp_init();
 	//setup_idt();
@@ -1674,16 +2260,15 @@ int main(int ac, char **av)
 #ifdef __x86_64__
 	//cache_test_case_no_fill_cache(3);
 	//cache_test_case_map_to_device_linear(3);
-	cache_test_case_map_to_none_linear(3);	//blocking
+	//cache_test_case_map_to_none_linear(3);	//blocking
 	//cache_test_case_map_to_memory_linear(3);
 #else
 	//cache_test_case_map_to_device_physical(3);
 	//cache_test_case_map_to_none_physical(3);
 #endif
-	
-	
+	exception_test();
 	debug_print("mem cache control memory malloc success\n");
-	test_cache_type();
+	//test_cache_type();
 
 	//free(cache_test_array);
 	//cache_test_array = NULL;
