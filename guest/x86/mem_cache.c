@@ -835,14 +835,14 @@ void test_cache_type(void)
 {
 #if 1
 	int i;
-	test_cache_type_uc(3);
-	test_cache_type_wb(3);
-	test_cache_type_wc(3);
-	test_cache_type_wt(3);
-	test_cache_type_wp(3);
+	test_cache_type_uc(41);
+	test_cache_type_wb(41);
+	test_cache_type_wc(41);
+	test_cache_type_wt(41);
+	test_cache_type_wp(41);
 	for(i=0; i<1; i++)
 	{
-		test_cache_type_wt_wp(3);
+		test_cache_type_wt_wp(41);
 		//test_cache_type_wc_uc();
 	}
 #endif
@@ -1636,6 +1636,7 @@ void cache_test_case_invalidation_exception_005(void)
 {
 	debug_print("\n");
 	asm volatile(".byte 0xF0\n\t" "wbinvd\n\t" : :);
+	//asm volatile(".byte 0xF0, 0x0F, 0x09\n\t"  : : : "memory");
 }
 #endif
 void wbinvd_exception_test()
@@ -1752,11 +1753,12 @@ void cache_test_case_clflush_exception_002(void)
 	u64 ss_mem;
 	u64 address=0;
 
-	ss_mem = 0x1122334455667788;
+	//ss_mem = 0x1122334455667788;
 
 	address = (unsigned long)(&ss_mem);
 	address = (address|(1UL<<63));
 	printf("%lx\n", address);
+	asm volatile(".byte 0x36\n\t" "clflush (%0)" : : "b" (address));
 
 	//debug_print("%p %lx\n", &ss_mem, address);
 	//asm volatile("movq %%rsp, %0\n" :"=m"(address) ::"memory");
@@ -1764,7 +1766,7 @@ void cache_test_case_clflush_exception_002(void)
 	//debug_print("%p %lx\n", &ss_mem, address);
 
 	//asm volatile("clflush %%rsp" : : );
-	asm volatile("clflush (%0)" : : "b" (address));
+	//asm volatile("clflush (%0)" : : "b" (address));
 }
 
 /*64bit mode page fault   PF
@@ -1923,12 +1925,18 @@ void cache_test_case_clflushopt_exception_002(void)
 
 	debug_print("\n");
 	ss_mem = 0x1122334455667788;
-
 	address = (unsigned long)(&ss_mem);
 	address = (address|(1UL<<63));
 	printf("%lx\n", address);
+	//asm volatile("movq %0,%%rsp\n": :"r"(address): "memory");
+	//asm volatile("clflushopt (%ss:0x18)" : :);
+	//".byte 0x0F, 0xAE\n\t"
+	//asm volatile(".byte 0x36, 0x0F, 0xAE\n\t" "(%ss:0x18)" : :);
+	//CFLUSH SS:Offset
 
-	asm volatile("clflushopt (%0)" : : "b" (address));
+	//asm volatile("mov $0xffffffff,%rax\n\r mov %ds:0xffffffff,%rax\n\r");
+	asm volatile("mov %ss:0x18,%rax\n\r");
+	asm volatile("mov $18,%rax\n\r");
 }
 
 /*64bit mode page fault   PF
@@ -2067,8 +2075,8 @@ void cache_test_case_clflushopt_exception_016(void)
 void clflushopt_exception_test()
 {
 #ifdef __x86_64__
-	//cache_test_case_clflushopt_exception_001();	//ok
-	cache_test_case_clflushopt_exception_002();	//fail
+	cache_test_case_clflushopt_exception_001();	//ok
+	//cache_test_case_clflushopt_exception_002();	//fail
 	//cache_test_case_clflushopt_exception_003();	//ok
 	//cache_test_case_clflushopt_exception_004();	//ok
 	//cache_test_case_clflushopt_exception_005();	//ok
@@ -2220,11 +2228,56 @@ void calibrate_tsc(void)
 	tsc_khz = (uint32_t)(tsc_hz / 1000UL);
 	printf("%s, ************ tsc_khz=0x%x\n", __func__, tsc_khz);
 }
+#if 0
+#include "apic.h"
+static void exception_leave(void)
+{
+    debug_print("exception_leave CPU %x.\n", apic_id());
+    while(true);
+}
+
+static void exception_ss_handler(struct ex_regs *regs)
+{
+    debug_print("#SS exception @ CPU %x.\n", apic_id());
+    debug_print("     rip:  0x%08lx\n", regs->rip);
+    debug_print("err code:  0x%08lx\n", regs->error_code);
+    regs->rip = (unsigned long) exception_leave;
+}
+
+static void exception_gp_handler(struct ex_regs *regs)
+{
+    debug_print("#GP exception @ CPU %x.\n", apic_id());
+    debug_print("     rip:  0x%08lx\n", regs->rip);
+    debug_print("err code:  0x%08lx\n", regs->error_code);
+    regs->rip = (unsigned long) exception_leave;
+}
+
+static void exception_pf_handler(struct ex_regs *regs)
+{
+    debug_print("#PF exception @ CPU %x.\n", apic_id());
+    debug_print("     rip:  0x%08lx\n", regs->rip);
+    debug_print("err code:  0x%08lx\n", regs->error_code);
+    regs->rip = (unsigned long) exception_leave;
+}
+
+static void exception_ud_handler(struct ex_regs *regs)
+{
+    debug_print("#UD exception @ CPU %x.\n", apic_id());
+    debug_print("     rip:  0x%08lx\n", regs->rip);
+    debug_print("err code:  0x%08lx\n", regs->error_code);
+    regs->rip = (unsigned long) exception_leave;
+}
+#endif
 
 int main(int ac, char **av)
 {
-#if 0	//wbinvd invd ring3 need
-	extern unsigned char kernel_entry;
+//	handle_exception(SS_VECTOR, exception_ss_handler);
+//	handle_exception(GP_VECTOR, exception_gp_handler);
+//	handle_exception(PF_VECTOR, exception_pf_handler);
+//	handle_exception(UD_VECTOR, exception_ud_handler);
+
+#if 1	//wbinvd invd ring3 need
+	//extern unsigned char kernel_entry;
 
 	setup_idt();
 	set_idt_entry(0x20, &kernel_entry, 3);
@@ -2288,8 +2341,9 @@ int main(int ac, char **av)
 	debug_print("mem cache control memory malloc success\n");
 	test_cache_type();
 
-	//free(cache_test_array);
-	//cache_test_array = NULL;
-
+	free(cache_test_array);
+	cache_test_array = NULL;
+	while(1)
+		;
 	return report_summary();
 }
