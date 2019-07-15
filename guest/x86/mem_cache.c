@@ -2277,7 +2277,7 @@ int main(int ac, char **av)
 //	handle_exception(UD_VECTOR, exception_ud_handler);
 
 #if 1	//wbinvd invd ring3 need
-	//extern unsigned char kernel_entry;
+	extern unsigned char kernel_entry;
 
 	setup_idt();
 	set_idt_entry(0x20, &kernel_entry, 3);
