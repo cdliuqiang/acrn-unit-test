@@ -102,4 +102,6 @@ struct pci_test_dev_hdr {
 
 #define  PCI_HEADER_TYPE_MASK		0x7f
 
+extern int visitPciDev(void * pArg);
+
 #endif /* PCI_H */

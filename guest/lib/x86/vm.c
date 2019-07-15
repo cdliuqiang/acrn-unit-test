@@ -133,7 +133,7 @@ bool any_present_pages(pgd_t *cr3, void *virt, size_t len)
 	return false;
 }
 
-static void setup_mmu_range(pgd_t *cr3, phys_addr_t start, size_t len)
+void setup_mmu_range(pgd_t *cr3, phys_addr_t start, size_t len)
 {
 	u64 max = (u64)len + (u64)start;
 	u64 phys = start;
